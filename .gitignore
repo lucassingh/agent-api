@@ -29,6 +29,3 @@ Thumbs.db
 # Audio files (in development)
 static/audio/*
 !static/audio/.gitkeep
-
-# Alembic
-alembic.ini
