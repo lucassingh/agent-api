@@ -15,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Tabla users - SIN ENUMs
+    # Tabla users - usa String en lugar de Enum
     op.create_table('users',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('email', sa.String(), nullable=True),
@@ -33,7 +33,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
     
-    # Tabla incidents - SIN ENUMs
+    # Tabla incidents - usa String en lugar de Enum
     op.create_table('incidents',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('title', sa.String(), nullable=False),
