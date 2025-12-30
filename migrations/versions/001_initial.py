@@ -7,6 +7,7 @@ Create Date: 2025-12-29 14:15:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision = '001_initial'
 down_revision = None
@@ -15,18 +16,19 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 1. Crear los tipos ENUM usando SQL directo
-    op.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userrole') THEN CREATE TYPE userrole AS ENUM ('admin', 'supervisor', 'operator'); END IF; END $$;")
-    op.execute("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'incidentstatus') THEN CREATE TYPE incidentstatus AS ENUM ('initiated', 'resolved', 'unresolved'); END IF; END $$;")
+    # 1. Crear ENUMs usando SQL puro con IF NOT EXISTS
+    op.execute("CREATE TYPE IF NOT EXISTS userrole AS ENUM ('admin', 'supervisor', 'operator')")
+    op.execute("CREATE TYPE IF NOT EXISTS incidentstatus AS ENUM ('initiated', 'resolved', 'unresolved')")
     
-    # 2. Crear tabla users usando sa.Enum (no postgresql.ENUM)
+    # 2. Crear tabla users - usando postgresql.ENUM con create_type=False
+    userrole_enum = postgresql.ENUM('admin', 'supervisor', 'operator', name='userrole', create_type=False)
     op.create_table('users',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('email', sa.String(), nullable=True),
         sa.Column('name', sa.String(), nullable=False),
         sa.Column('lastname', sa.String(), nullable=False),
         sa.Column('hashed_password', sa.String(), nullable=False),
-        sa.Column('role', sa.Enum('admin', 'supervisor', 'operator', name='userrole'), server_default='operator', nullable=False),
+        sa.Column('role', userrole_enum, server_default='operator', nullable=False),
         sa.Column('is_verified', sa.Boolean(), server_default='false', nullable=False),
         sa.Column('is_active', sa.Boolean(), server_default='true', nullable=False),
         sa.Column('verification_code', sa.String(), nullable=True),
@@ -37,14 +39,15 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
     
-    # 3. Crear tabla incidents usando sa.Enum
+    # 3. Crear tabla incidents
+    incidentstatus_enum = postgresql.ENUM('initiated', 'resolved', 'unresolved', name='incidentstatus', create_type=False)
     op.create_table('incidents',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('title', sa.String(), nullable=False),
         sa.Column('problem_audio_path', sa.String(), nullable=False),
         sa.Column('solution_audio_path', sa.String(), nullable=True),
         sa.Column('observations', sa.Text(), nullable=True),
-        sa.Column('status', sa.Enum('initiated', 'resolved', 'unresolved', name='incidentstatus'), server_default='initiated', nullable=False),
+        sa.Column('status', incidentstatus_enum, server_default='initiated', nullable=False),
         sa.Column('is_resolved', sa.Boolean(), server_default='false', nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
@@ -65,6 +68,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
     
-    # Eliminar tipos ENUM
-    op.execute("DROP TYPE IF EXISTS incidentstatus")
-    op.execute("DROP TYPE IF EXISTS userrole")
+    # Eliminar ENUMs
+    op.execute("DROP TYPE IF EXISTS incidentstatus CASCADE")
+    op.execute("DROP TYPE IF EXISTS userrole CASCADE")
